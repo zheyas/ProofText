@@ -371,26 +371,37 @@
       const form = document.querySelector('main.content form');
       const progressBar = document.getElementById('progress-bar');
       const submitBtn = form.querySelector('button[type="submit"]');
+      const submitText = submitBtn ? submitBtn.textContent : '';
 
       form.addEventListener('submit', () => {
-        // Показываем прогресс-бар и обнуляем ширину
-        progressBar.style.display = 'block';
+        // Показываем прогресс-бар с нуля без анимации
+        progressBar.style.transition = 'none';
         progressBar.style.width = '0%';
+        progressBar.style.display = 'block';
+        progressBar.offsetWidth; // фиксируем 0% до запуска перехода
 
-        let width = 0;
-        const interval = setInterval(() => {
-          if (width >= 90) {
-            clearInterval(interval);
-          } else {
-            width += 10;
-            progressBar.style.width = width + '%';
-          }
-        }, 300);
+        // Реальный прогресс загрузки неизвестен: полоса плавно
+        // замедляется к 90% и ждёт ответа сервера
+        progressBar.style.transition = 'width 8s cubic-bezier(0.1, 0.7, 0.25, 1)';
+        progressBar.style.width = '90%';
 
         // Блокируем кнопку и меняем текст
         if (submitBtn) {
           submitBtn.disabled = true;
           submitBtn.textContent = "Загрузка...";
+        }
+      });
+
+      // При возврате «Назад» браузер может показать страницу из кэша
+      // в состоянии «Загрузка...» — сбрасываем его
+      window.addEventListener('pageshow', (e) => {
+        if (!e.persisted) return;
+        progressBar.style.transition = 'none';
+        progressBar.style.display = 'none';
+        progressBar.style.width = '0%';
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = submitText;
         }
       });
     });
