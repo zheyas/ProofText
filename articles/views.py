@@ -179,10 +179,15 @@ def analyze_report(request, report_id):
     originality_percent, ai_score, details = analyze_report_logic(report)
 
     request.session["plagiarism_details"] = details
+    originality = (
+        f"{originality_percent:.2f}%"
+        if originality_percent is not None
+        else "не проверена (поиск DuckDuckGo недоступен)"
+    )
     messages.success(
         request,
-        f"Проверка завершена. Оригинальность:"
-        f"{originality_percent:.2f}%, ИИ: {ai_score:.2f}%",
+        f"Проверка завершена. Оригинальность: "
+        f"{originality}, ИИ: {ai_score:.2f}%",
     )
     return redirect("get_reference", report_id=report.id)
 

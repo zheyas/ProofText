@@ -11,7 +11,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from .ai_detection import detect_ai
-from .external_search import search_google_fragment
+from .external_search import SearchUnavailableError, search_fragment
 
 
 def extract_text_from_pdf(pdf_file):
@@ -38,13 +38,20 @@ def analyze_text_fragments(text):
         if len(words[i: i + fragment_size]) >= 10
     ]
 
+    # DuckDuckGo быстро блокирует частые запросы, поэтому проверяем
+    # не больше SEARCH_MAX_FRAGMENTS фрагментов, равномерно по тексту
+    limit = settings.SEARCH_MAX_FRAGMENTS
+    if len(fragments) > limit:
+        stride = len(fragments) / limit
+        fragments = [fragments[int(i * stride)] for i in range(limit)]
+
     plagiarism_hits = 0
     total_checked = 0
     detailed_matches = []
 
     for frag in fragments:
         try:
-            results = search_google_fragment(frag)
+            results = search_fragment(frag)
             best_match = None
             best_score = 0.0
 
@@ -73,11 +80,15 @@ def analyze_text_fragments(text):
                 detailed_matches.append(best_match)
 
             total_checked += 1
+        except SearchUnavailableError:
+            # Повторные запросы во время блокировки только продлят её
+            break
         except Exception:
             continue
 
+    # Ни один фрагмент не проверен — оригинальность неизвестна, а не 100%
     originality_percent = (
-        100.0
+        None
         if total_checked == 0
         else max(0.0, 100.0 - (plagiarism_hits / total_checked) * 100.0)
     )
@@ -94,7 +105,10 @@ def analyze_report_logic(report):
     except Exception:
         ai_score = 0.0
 
-    report.originality_percent = round(originality_percent, 2)
+    report.originality_percent = (
+        round(originality_percent, 2)
+        if originality_percent is not None else None
+    )
     report.ai_generated_percent = round(ai_score, 2)
     report.save()
 

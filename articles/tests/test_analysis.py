@@ -1,9 +1,13 @@
 # articles/tests/test_analysis.py
 from unittest.mock import patch
 
+import pytest
+from ddgs.exceptions import DDGSException
+
 from articles import cache_utils
 from articles.ai_detection import detect_ai
-from articles.external_search import search_google_fragment
+from articles.external_search import SearchUnavailableError, search_fragment
+from articles.use_cases import analyze_text_fragments
 
 
 def test_cache_set_and_get(tmp_path, monkeypatch):
@@ -20,29 +24,53 @@ def test_cache_set_and_get(tmp_path, monkeypatch):
     assert cached == test_results
 
 
-@patch("articles.external_search.get_cached_result")
-@patch("articles.external_search.set_cached_result")
-@patch("articles.external_search.requests.get")
-def test_search_google_fragment_uses_api(mock_get,
+@patch("articles.decorators.get_cached_result")
+@patch("articles.decorators.set_cached_result")
+@patch("articles.external_search.DDGS")
+def test_search_fragment_uses_duckduckgo(mock_ddgs,
                                          mock_set_cache,
                                          mock_get_cache):
     mock_get_cache.return_value = None
 
-    mock_response = {
-        "items": [
-            {"title": "Test Result",
-             "link": "http://example.com", "snippet": "snippet"}
-        ]
-    }
+    mock_ddgs.return_value.text.return_value = [
+        {"title": "Test Result",
+         "href": "http://example.com", "body": "snippet"}
+    ]
 
-    mock_get.return_value.status_code = 200
-    mock_get.return_value.json.return_value = mock_response
-
-    result = search_google_fragment("unit test example")
+    result = search_fragment("unit test example")
 
     assert isinstance(result, list)
-    assert result[0]["title"] == "Test Result"
+    assert result[0] == {"title": "Test Result",
+                         "url": "http://example.com", "snippet": "snippet"}
     assert mock_set_cache.called
+
+
+@patch("articles.decorators.get_cached_result")
+@patch("articles.decorators.set_cached_result")
+@patch("articles.external_search.DDGS")
+def test_search_fragment_blocked_is_not_cached(mock_ddgs,
+                                               mock_set_cache,
+                                               mock_get_cache):
+    mock_get_cache.return_value = None
+    mock_ddgs.return_value.text.side_effect = DDGSException(
+        "No results found.")
+
+    with pytest.raises(SearchUnavailableError):
+        search_fragment("unit test example")
+
+    assert not mock_set_cache.called
+
+
+@patch("articles.use_cases.search_fragment")
+def test_originality_unknown_when_search_unavailable(mock_search):
+    mock_search.side_effect = SearchUnavailableError
+
+    originality, matches = analyze_text_fragments("слово " * 100)
+
+    assert originality is None
+    assert matches == []
+    # После первой блокировки поиск больше не дёргаем
+    assert mock_search.call_count == 1
 
 
 def test_detect_ai_probability_range():

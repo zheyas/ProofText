@@ -1,0 +1,54 @@
+# Blueprint для Render: https://render.com/docs/blueprint-spec
+databases:
+  - name: prooftext-db
+    databaseName: prooftext
+    user: prooftext_user
+    region: frankfurt
+    plan: free
+    ipAllowList: []  # только внутренние подключения из сервисов Render
+
+services:
+  - type: web
+    name: prooftext
+    runtime: python
+    region: frankfurt
+    # free/starter = 512 МБ RAM: сайт работает, но для AI-анализа
+    # (torch + RoBERTa) нужен план standard (2 ГБ)
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 180
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: DB_NAME
+        fromDatabase:
+          name: prooftext-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: prooftext-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: prooftext-db
+          property: password
+      - key: DB_HOST
+        fromDatabase:
+          name: prooftext-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: prooftext-db
+          property: port
+      - key: SEARCH_MAX_FRAGMENTS
+        value: "10"
+      - key: AI_MODEL_NAME
+        value: openai-community/roberta-base-openai-detector
+      # Кэш Hugging Face внутри проекта, чтобы скачанная при сборке модель
+      # попала в деплой
+      - key: HF_HOME
+        value: /opt/render/project/src/.hf_cache

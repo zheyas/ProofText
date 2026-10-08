@@ -13,7 +13,25 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Секретный ключ и режим
 SECRET_KEY = os.getenv("SECRET_KEY", "replace-this-in-production")
 DEBUG = os.getenv("DEBUG", "True") == "True"
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv("ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
+CSRF_TRUSTED_ORIGINS = []
+
+# Render сам задаёт внешний домен сервиса
+RENDER_EXTERNAL_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
+
+# HTTPS терминируется на прокси Render
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 LOGIN_URL = "/users/auth/"
@@ -47,6 +65,7 @@ SIMPLE_JWT = {
 # Middleware
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -74,8 +93,13 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "core.wsgi.application"
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID", "")
+# Сколько фрагментов доклада искать в DuckDuckGo за одну проверку
+SEARCH_MAX_FRAGMENTS = int(os.getenv("SEARCH_MAX_FRAGMENTS", "10"))
+
+# Модель Hugging Face для оценки AI-генерации
+AI_MODEL_NAME = os.getenv(
+    "AI_MODEL_NAME", "openai-community/roberta-base-openai-detector"
+)
 
 # База данных: PostgreSQL из .env
 DATABASES = {
@@ -116,6 +140,15 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
 ]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    # WhiteNoise раздаёт статику без отдельного веб-сервера
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
 
 # PK по умолчанию
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

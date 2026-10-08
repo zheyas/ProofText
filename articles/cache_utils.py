@@ -4,7 +4,7 @@ import os
 import threading
 from time import time
 
-CACHE_FILE = "google_search_cache.json"
+CACHE_FILE = "search_cache.json"
 CACHE_LOCK = threading.Lock()
 CACHE_EXPIRATION = 60 * 60 * 24  # 24 часа
 

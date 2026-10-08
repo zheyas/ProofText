@@ -5,7 +5,9 @@ __pycache__/
 
 # C extensions
 *.so
-google_search_cache.json
+search_cache.json
+# Hugging Face cache (Render build)
+.hf_cache/
 # Virtual environment
 .venv/
 env/
