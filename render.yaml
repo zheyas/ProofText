@@ -10,16 +10,13 @@ databases:
 services:
   - type: web
     name: prooftext
-    runtime: python
+    runtime: docker
+    dockerfilePath: ./Dockerfile
     region: frankfurt
     # free/starter = 512 МБ RAM: сайт работает, но для AI-анализа
     # (torch + RoBERTa) нужен план standard (2 ГБ)
     plan: free
-    buildCommand: ./build.sh
-    startCommand: gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 180
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.9
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
@@ -48,7 +45,3 @@ services:
         value: "10"
       - key: AI_MODEL_NAME
         value: openai-community/roberta-base-openai-detector
-      # Кэш Hugging Face внутри проекта, чтобы скачанная при сборке модель
-      # попала в деплой
-      - key: HF_HOME
-        value: /opt/render/project/src/.hf_cache
